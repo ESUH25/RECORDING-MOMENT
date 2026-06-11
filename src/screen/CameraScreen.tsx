@@ -311,13 +311,22 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
   }, []);
 
   const takePhoto = () => {
+    const f = activeFilterRef.current;
+    const hasFilter = f.css !== "none" && f.id !== "normal";
+
     if (beautyOn && beautyCanvasRef.current) {
       const bc = beautyCanvasRef.current;
       const canvas = captureCanvasRef.current;
       if (!canvas) return;
       canvas.width = bc.width;
       canvas.height = bc.height;
-      canvas.getContext("2d")!.drawImage(bc, 0, 0);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      if (hasFilter) {
+        ctx.filter = f.css;
+      }
+      ctx.drawImage(bc, 0, 0);
+      ctx.filter = "none";
       _saveCapture(canvas);
     } else {
       const video = videoRef.current;
@@ -331,8 +340,9 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
         ctx.translate(canvas.width, 0);
         ctx.scale(-1, 1);
       }
-      const f = activeFilterRef.current;
-      if (f.css !== "none") ctx.filter = f.css;
+      if (hasFilter) {
+        ctx.filter = f.css;
+      }
       ctx.drawImage(video, 0, 0);
       ctx.filter = "none";
       _saveCapture(canvas);
