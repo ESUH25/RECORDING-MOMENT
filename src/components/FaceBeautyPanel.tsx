@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { BeautyParams } from "../Facebeautyengine";
-import "./FaceBeautyPanel.css";
+import "./Facebeautypanel.css";
 
 interface Props {
   params: BeautyParams;
