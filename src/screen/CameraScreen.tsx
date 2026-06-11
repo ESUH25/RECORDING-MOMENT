@@ -9,6 +9,31 @@ import { FaceBeautyEngine, DEFAULT_BEAUTY } from "../Facebeautyengine.ts";
 import type { BeautyParams } from "../Facebeautyengine.ts";
 import "./CameraScreen.css";
 
+const STORAGE_KEY = "remon__captures";
+const H24 = 24 * 60 * 60 * 1000;
+
+function loadCaptures(): MediaItem[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const items: MediaItem[] = JSON.parse(raw);
+    const now = Date.now();
+    return items.filter((item) => now - item.capturedAt < H24);
+  } catch {
+    return [];
+  }
+}
+
+function saveCaptures(items: MediaItem[]) {
+  try {
+    const now = Date.now();
+    const filtered = items.filter((item) => now - item.capturedAt < H24);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+  } catch {
+    // localStorage 용량 초과 시 무시
+  }
+}
+
 interface CameraScreenProps {
   onCapture?: (item: MediaItem) => void;
   onNavigate?: (screen: Screen) => void;
@@ -113,7 +138,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
   const engineRef = useRef<FaceBeautyEngine | null>(null);
 
   const [facingMode, setFacingMode] = useState<FacingMode>("environment");
-  const [captures, setCaptures] = useState<MediaItem[]>([]);
+  const [captures, setCaptures] = useState<MediaItem[]>(() => loadCaptures());
   const [showGallery, setShowGallery] = useState(false);
   const [showFrameStudio, setShowFrameStudio] = useState(false);
   const [flashVisible, setFlashVisible] = useState(false);
@@ -142,6 +167,11 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
   const beautyOn = Object.values(beautyParams).some((v) => v !== 0);
   const anyBeauty = beautyOn;
   const panelOpen = showBeauty || showFilter;
+
+  // captures 변경 시 localStorage에 저장
+  useEffect(() => {
+    saveCaptures(captures);
+  }, [captures]);
 
   useEffect(() => {
     beautyParamsRef.current = beautyParams;
@@ -346,7 +376,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
       let r = d[i],
         g = d[i + 1],
         b = d[i + 2];
-
       if (p.grayscale > 0) {
         const gray = 0.299 * r + 0.587 * g + 0.114 * b;
         r = r + (gray - r) * p.grayscale;
@@ -397,7 +426,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
         g = Math.max(0, Math.min(255, (g - 128) * p.contrast + 128));
         b = Math.max(0, Math.min(255, (b - 128) * p.contrast + 128));
       }
-
       d[i] = r;
       d[i + 1] = g;
       d[i + 2] = b;
@@ -408,8 +436,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
 
   const takePhoto = () => {
     const f = activeFilterRef.current;
-    console.log("filter id:", f.id, "| css:", f.css);
-    console.log("beautyOn:", beautyOn);
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
@@ -436,7 +462,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
     mctx.drawImage(src, 0, 0);
 
     const filtered = applyFilterToCanvas(mid, f);
-
     canvas.width = srcW;
     canvas.height = srcH;
     canvas.getContext("2d")!.drawImage(filtered, 0, 0);
@@ -557,7 +582,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
           >
             <CompositionIcon />
           </button>
-
           <button
             className={`cam__icon-btn ${showBeauty || anyBeauty ? "cam__icon-btn--active" : ""}`}
             onClick={toggleBeauty}
@@ -566,7 +590,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
             <BeautyIcon />
             {anyBeauty && !showBeauty && <span className="cam__icon-btn-dot" />}
           </button>
-
           <button
             className={`cam__icon-btn ${showFilter || activeFilter.id !== "normal" ? "cam__icon-btn--active" : ""}`}
             onClick={toggleFilter}
@@ -577,7 +600,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
               <span className="cam__icon-btn-dot" />
             )}
           </button>
-
           {onLogout && (
             <button
               className="cam__icon-btn"
