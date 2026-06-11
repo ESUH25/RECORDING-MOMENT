@@ -442,24 +442,27 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  overflow: hidden;
+  min-height: 0; /* ← 핵심: flex 자식이 부모 넘치지 않게 */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
   gap: 12px;
-  padding: 12px 16px max(calc(0.5cm + env(safe-area-inset-bottom, 0px)), 16px);
+  padding: 12px 16px max(calc(env(safe-area-inset-bottom, 0px) + 16px), 24px);
   position: relative;
   z-index: 10;
-  touch-action: none;
+  touch-action: pan-y;
 }
 
 .fsc__preview-canvas {
   display: block;
-  width: calc(100% - 0.4cm);
-  max-width: calc(100% - 0.4cm);
-  max-height: calc(100vh - 240px + 6cm);
+  width: auto;
+  max-width: calc(100% - 32px);
+  max-height: 100%;
   height: auto;
-  object-fit: cover;
   border-radius: 10px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
   flex-shrink: 1;
+  min-height: 0;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
