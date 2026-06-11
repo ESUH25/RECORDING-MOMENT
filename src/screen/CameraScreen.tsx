@@ -408,6 +408,8 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
 
   const takePhoto = () => {
     const f = activeFilterRef.current;
+    console.log("filter id:", f.id, "| css:", f.css);
+    console.log("beautyOn:", beautyOn);
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
