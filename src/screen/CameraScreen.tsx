@@ -312,41 +312,46 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
 
   const takePhoto = () => {
     const f = activeFilterRef.current;
-    const hasFilter = f.css !== "none" && f.id !== "normal";
+    const hasFilter = f.id !== "normal";
 
-    if (beautyOn && beautyCanvasRef.current) {
-      const bc = beautyCanvasRef.current;
-      const canvas = captureCanvasRef.current;
-      if (!canvas) return;
-      canvas.width = bc.width;
-      canvas.height = bc.height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      if (hasFilter) {
-        ctx.filter = f.css;
-      }
-      ctx.drawImage(bc, 0, 0);
-      ctx.filter = "none";
-      _saveCapture(canvas);
-    } else {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      if (!video || !canvas) return;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      if (facingMode === "user") {
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
-      }
-      if (hasFilter) {
-        ctx.filter = f.css;
-      }
-      ctx.drawImage(video, 0, 0);
-      ctx.filter = "none";
-      _saveCapture(canvas);
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    const src: CanvasImageSource =
+      beautyOn && beautyCanvasRef.current ? beautyCanvasRef.current : video;
+    const srcW =
+      src instanceof HTMLVideoElement
+        ? src.videoWidth
+        : (src as HTMLCanvasElement).width;
+    const srcH =
+      src instanceof HTMLVideoElement
+        ? src.videoHeight
+        : (src as HTMLCanvasElement).height;
+
+    canvas.width = srcW;
+    canvas.height = srcH;
+    const ctx = canvas.getContext("2d")!;
+
+    if (facingMode === "user" && !beautyOn) {
+      ctx.translate(srcW, 0);
+      ctx.scale(-1, 1);
     }
+
+    if (hasFilter) {
+      const tmp = document.createElement("canvas");
+      tmp.width = srcW;
+      tmp.height = srcH;
+      const tctx = tmp.getContext("2d")!;
+      tctx.filter = f.css;
+      tctx.drawImage(src as CanvasImageSource, 0, 0);
+      tctx.filter = "none";
+      ctx.drawImage(tmp, 0, 0);
+    } else {
+      ctx.drawImage(src as CanvasImageSource, 0, 0);
+    }
+
+    _saveCapture(canvas);
   };
 
   const _saveCapture = (canvas: HTMLCanvasElement) => {
