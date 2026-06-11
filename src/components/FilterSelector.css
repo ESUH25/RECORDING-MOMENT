@@ -1,0 +1,101 @@
+.flt {
+  width: 100%;
+}
+
+.flt__scroll {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 8px 24px 4px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+}
+
+.flt__scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.flt__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  scroll-snap-align: center;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.flt__item:active {
+  transform: scale(0.92);
+}
+
+.flt__thumb-wrap {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  overflow: visible;
+}
+
+.flt__thumb-img {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  transition: border-color 0.2s;
+}
+
+.flt__thumb-placeholder {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.18);
+}
+
+.flt__thumb-ring {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2.5px solid #ffe033;
+  pointer-events: none;
+  animation: fltRingIn 0.2s ease;
+}
+
+@keyframes fltRingIn {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.flt__item--on .flt__thumb-img {
+  border-color: transparent;
+}
+
+.flt__label {
+  font-family: "DM Sans", sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  transition: color 0.2s;
+}
+
+.flt__item--on .flt__label {
+  color: #ffe033;
+  font-weight: 700;
+}
