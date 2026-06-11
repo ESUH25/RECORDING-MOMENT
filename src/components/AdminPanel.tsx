@@ -133,7 +133,7 @@ export default function AdminPanel({ onClose }: Props) {
   const [ovErr, setOvErr] = useState("");
   const [fileKB, setFileKB] = useState(0);
   const [numSlots, setNumSlots] = useState(1);
-  const [aspect, setAspect] = useState(0.75); // 기본값 3:4 세로형
+  const [aspect, setAspect] = useState(1.0);
 
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -226,7 +226,17 @@ export default function AdminPanel({ onClose }: Props) {
     setOvErr("");
     setFileKB(Math.round(f.size / 1024));
     const reader = new FileReader();
-    reader.onload = (ev) => setOvUrl((ev.target?.result as string) ?? "");
+    reader.onload = (ev) => {
+      const dataUrl = (ev.target?.result as string) ?? "";
+      setOvUrl(dataUrl);
+      // PNG 원본 크기로 비율 자동 감지
+      const img = new Image();
+      img.onload = () => {
+        const detectedAspect = img.naturalWidth / img.naturalHeight;
+        setAspect(Math.round(detectedAspect * 1000) / 1000);
+      };
+      img.src = dataUrl;
+    };
     reader.readAsDataURL(f);
     e.target.value = "";
   };
@@ -265,7 +275,6 @@ export default function AdminPanel({ onClose }: Props) {
       setTag("");
       setBg("#ffffff");
       setInset(D_INSET);
-      setAspect(0.75);
       setOvUrl("");
       setFileKB(0);
       setNumSlots(1);
@@ -492,48 +501,6 @@ export default function AdminPanel({ onClose }: Props) {
                 {numSlots === 3 && "사진 3장 → 인셋 영역을 세로 3등분 배치"}
                 {numSlots === 4 && "사진 4장 → 인셋 영역을 2×2 그리드 배치"}
               </p>
-            </div>
-
-            <div className="ap__field">
-              <label className="ap__label">
-                프레임 비율 (가로 : 세로) —{" "}
-                {aspect < 1
-                  ? `세로형 ${Math.round(aspect * 100)} : 100`
-                  : aspect === 1
-                    ? "정사각형 1 : 1"
-                    : `가로형 100 : ${Math.round((1 / aspect) * 100)}`}
-              </label>
-              <div className="ap__inset-row">
-                <span className="ap__inset-lbl">좁게</span>
-                <input
-                  type="range"
-                  className="ap__slider"
-                  min={0.5}
-                  max={1.5}
-                  step={0.05}
-                  value={aspect}
-                  onChange={(e) => setAspect(Number(e.target.value))}
-                />
-                <span className="ap__inset-lbl">넓게</span>
-                <span className="ap__inset-val">{aspect.toFixed(2)}</span>
-              </div>
-              <div className="ap__slots-row" style={{ marginTop: 6 }}>
-                {[
-                  { label: "3:4", value: 0.75 },
-                  { label: "9:16", value: 0.5625 },
-                  { label: "1:1", value: 1.0 },
-                  { label: "4:3", value: 1.333 },
-                ].map((p) => (
-                  <button
-                    key={p.label}
-                    type="button"
-                    className={`ap__slot-btn ${Math.abs(aspect - p.value) < 0.01 ? "ap__slot-btn--on" : ""}`}
-                    onClick={() => setAspect(p.value)}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
             </div>
 
             <div className="ap__prev-row">
