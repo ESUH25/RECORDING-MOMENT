@@ -457,12 +457,11 @@
   display: block;
   width: auto;
   max-width: calc(100% - 32px);
-  max-height: 100%;
+  max-height: calc(100vh - 200px);
   height: auto;
   border-radius: 10px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
   flex-shrink: 1;
-  min-height: 0;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -479,7 +478,6 @@
   flex-wrap: wrap;
   justify-content: center;
   flex-shrink: 0;
-  margin-top: calc(1cm + 1.5cm);
 }
 
 .fsc__sec-btn {
