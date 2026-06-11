@@ -131,6 +131,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
 
   const [activeFilter, setActiveFilter] = useState<CameraFilter>(FILTERS[0]);
   const [showFilter, setShowFilter] = useState(false);
+  const activeFilterRef = useRef<CameraFilter>(FILTERS[0]);
 
   const [beautyParams, setBeautyParams] = useState<BeautyParams>({
     ...DEFAULT_BEAUTY,
@@ -140,13 +141,33 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
   const beautyParamsRef = useRef<BeautyParams>({ ...DEFAULT_BEAUTY });
   const beautyOn = Object.values(beautyParams).some((v) => v !== 0);
   const anyBeauty = beautyOn;
-
   const panelOpen = showBeauty || showFilter;
 
   useEffect(() => {
     beautyParamsRef.current = beautyParams;
     engineRef.current?.updateParams(beautyParams);
   }, [beautyParams]);
+
+  const handleFilterChange = useCallback((filter: CameraFilter) => {
+    activeFilterRef.current = filter;
+    setActiveFilter(filter);
+    const video = videoRef.current;
+    if (video && !beautyParamsRef.current) return;
+    if (video) {
+      video.style.filter = filter.css === "none" ? "" : filter.css;
+    }
+  }, []);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (beautyOn) {
+      video.style.filter = "";
+    } else {
+      const f = activeFilterRef.current;
+      video.style.filter = f.css === "none" ? "" : f.css;
+    }
+  }, [beautyOn]);
 
   const startCamera = useCallback(async () => {
     setCameraReady(false);
@@ -162,6 +183,10 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
         videoRef.current.onloadeddata = () => {
           void videoRef.current!.play();
           setCameraReady(true);
+          const f = activeFilterRef.current;
+          if (videoRef.current) {
+            videoRef.current.style.filter = f.css === "none" ? "" : f.css;
+          }
         };
       }
       setError(null);
@@ -281,7 +306,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
       await engine.init();
     } catch {
       setBeautyLoading(false);
-      setError("뷰티 기능을 불러올 수 없습니다.");
+      setError("리터치 기능을 불러올 수 없습니다.");
     }
   }, []);
 
@@ -306,7 +331,8 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
         ctx.translate(canvas.width, 0);
         ctx.scale(-1, 1);
       }
-      if (activeFilter.css !== "none") ctx.filter = activeFilter.css;
+      const f = activeFilterRef.current;
+      if (f.css !== "none") ctx.filter = f.css;
       ctx.drawImage(video, 0, 0);
       ctx.filter = "none";
       _saveCapture(canvas);
@@ -382,14 +408,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
         onTouchStart={handleVideoTouchStart}
         onTouchMove={handleVideoTouchMove}
         onTouchEnd={handleVideoTouchEnd}
-        style={{
-          touchAction: "none",
-          filter:
-            !beautyOn && activeFilter.css !== "none"
-              ? activeFilter.css
-              : undefined,
-          transition: "filter 0.25s ease",
-        }}
+        style={{ touchAction: "none", transition: "filter 0.25s ease" }}
       />
 
       <canvas
@@ -420,7 +439,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
       {beautyLoading && (
         <div className="cam__beauty-loading">
           <div className="cam__beauty-spinner" />
-          <span>뷰티 준비 중...</span>
+          <span>리터치 준비 중...</span>
         </div>
       )}
 
@@ -550,7 +569,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
         {showFilter && (
           <FilterSelector
             activeId={activeFilter.id}
-            onChange={(f) => setActiveFilter(f)}
+            onChange={handleFilterChange}
             videoRef={videoRef as React.RefObject<HTMLVideoElement>}
           />
         )}
