@@ -566,7 +566,7 @@ export default function FrameStudio({ captures, onClose }: Props) {
         name: mf.name,
         tag: mf.tag,
         slotCount: n,
-        aspect: 1.0,
+        aspect: mf.aspect ?? 1.0,
         slots,
         bg(ctx, cw, ch) {
           ctx.fillStyle = mf.bgColor;
@@ -880,7 +880,7 @@ export default function FrameStudio({ captures, onClose }: Props) {
               {mediaItems.length === 0 ? (
                 <div className="fsc__sheet-empty">
                   <p>📸 촬영된 사진이 없어요</p>
-                  <p>사진을 찍거나 영상을 촬영한 뒤 다시 시도해 주세요</p>
+                  <p>사진을 찍은 후에 다시 시도해 주세요</p>
                 </div>
               ) : (
                 <div className="fsc__photo-grid">

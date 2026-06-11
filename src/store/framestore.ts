@@ -21,6 +21,7 @@ export interface ManagedFrame {
   inset: PhotoInset;
   numSlots: number;
   slotInsets?: PhotoInset[];
+  aspect: number;
   createdAt: number;
 }
 
@@ -57,6 +58,7 @@ export async function getFramesAsync(): Promise<ManagedFrame[]> {
       },
       overlayDataUrl: row.overlay_data_url ?? "",
       slotInsets: row.slot_insets ?? undefined,
+      aspect: row.aspect ?? 1.0,
       createdAt: Number(row.created_at),
     }));
   } catch (e) {
@@ -82,6 +84,7 @@ export async function addFrameAsync(
     inset_left: data.inset.left,
     overlay_data_url: data.overlayDataUrl ?? null,
     slot_insets: data.slotInsets ?? null,
+    aspect: data.aspect ?? 1.0,
     created_at: now,
   });
   if (error) throw error;
