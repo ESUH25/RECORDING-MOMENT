@@ -310,15 +310,109 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
     }
   }, []);
 
+  const parseCssFilter = (css: string) => {
+    const get = (fn: string) => {
+      const m = css.match(new RegExp(`${fn}\\(([^)]+)\\)`));
+      if (!m) return null;
+      return parseFloat(m[1]);
+    };
+    const hueMatch = css.match(/hue-rotate\(([^)]+)deg\)/);
+    return {
+      brightness: get("brightness") ?? 1,
+      contrast: get("contrast") ?? 1,
+      saturate: get("saturate") ?? 1,
+      sepia: get("sepia") ?? 0,
+      grayscale: get("grayscale") ?? 0,
+      hueRotate: hueMatch ? parseFloat(hueMatch[1]) : 0,
+    };
+  };
+
+  const applyFilterToCanvas = (
+    srcCanvas: HTMLCanvasElement,
+    filter: CameraFilter,
+  ): HTMLCanvasElement => {
+    const out = document.createElement("canvas");
+    out.width = srcCanvas.width;
+    out.height = srcCanvas.height;
+    const ctx = out.getContext("2d")!;
+    ctx.drawImage(srcCanvas, 0, 0);
+    if (filter.id === "normal") return out;
+
+    const imageData = ctx.getImageData(0, 0, out.width, out.height);
+    const d = imageData.data;
+    const p = parseCssFilter(filter.css);
+
+    for (let i = 0; i < d.length; i += 4) {
+      let r = d[i],
+        g = d[i + 1],
+        b = d[i + 2];
+
+      if (p.grayscale > 0) {
+        const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+        r = r + (gray - r) * p.grayscale;
+        g = g + (gray - g) * p.grayscale;
+        b = b + (gray - b) * p.grayscale;
+      }
+      if (p.sepia > 0) {
+        const sr = Math.min(255, r * 0.393 + g * 0.769 + b * 0.189);
+        const sg = Math.min(255, r * 0.349 + g * 0.686 + b * 0.168);
+        const sb = Math.min(255, r * 0.272 + g * 0.534 + b * 0.131);
+        r = r + (sr - r) * p.sepia;
+        g = g + (sg - g) * p.sepia;
+        b = b + (sb - b) * p.sepia;
+      }
+      if (p.hueRotate !== 0) {
+        const angle = (p.hueRotate * Math.PI) / 180;
+        const cos = Math.cos(angle),
+          sin = Math.sin(angle);
+        const nr =
+          r * (0.213 + cos * 0.787 - sin * 0.213) +
+          g * (0.715 - cos * 0.715 - sin * 0.715) +
+          b * (0.072 - cos * 0.072 + sin * 0.928);
+        const ng =
+          r * (0.213 - cos * 0.213 + sin * 0.143) +
+          g * (0.715 + cos * 0.285 + sin * 0.14) +
+          b * (0.072 - cos * 0.072 - sin * 0.283);
+        const nb =
+          r * (0.213 - cos * 0.213 - sin * 0.787) +
+          g * (0.715 - cos * 0.715 + sin * 0.715) +
+          b * (0.072 + cos * 0.928 + sin * 0.072);
+        r = Math.max(0, Math.min(255, nr));
+        g = Math.max(0, Math.min(255, ng));
+        b = Math.max(0, Math.min(255, nb));
+      }
+      if (p.saturate !== 1) {
+        const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+        r = Math.max(0, Math.min(255, gray + (r - gray) * p.saturate));
+        g = Math.max(0, Math.min(255, gray + (g - gray) * p.saturate));
+        b = Math.max(0, Math.min(255, gray + (b - gray) * p.saturate));
+      }
+      if (p.brightness !== 1) {
+        r = Math.max(0, Math.min(255, r * p.brightness));
+        g = Math.max(0, Math.min(255, g * p.brightness));
+        b = Math.max(0, Math.min(255, b * p.brightness));
+      }
+      if (p.contrast !== 1) {
+        r = Math.max(0, Math.min(255, (r - 128) * p.contrast + 128));
+        g = Math.max(0, Math.min(255, (g - 128) * p.contrast + 128));
+        b = Math.max(0, Math.min(255, (b - 128) * p.contrast + 128));
+      }
+
+      d[i] = r;
+      d[i + 1] = g;
+      d[i + 2] = b;
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return out;
+  };
+
   const takePhoto = () => {
     const f = activeFilterRef.current;
-    const hasFilter = f.id !== "normal";
-
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
-    const src: CanvasImageSource =
+    const src =
       beautyOn && beautyCanvasRef.current ? beautyCanvasRef.current : video;
     const srcW =
       src instanceof HTMLVideoElement
@@ -329,28 +423,21 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
         ? src.videoHeight
         : (src as HTMLCanvasElement).height;
 
+    const mid = document.createElement("canvas");
+    mid.width = srcW;
+    mid.height = srcH;
+    const mctx = mid.getContext("2d")!;
+    if (facingMode === "user" && !beautyOn) {
+      mctx.translate(srcW, 0);
+      mctx.scale(-1, 1);
+    }
+    mctx.drawImage(src, 0, 0);
+
+    const filtered = applyFilterToCanvas(mid, f);
+
     canvas.width = srcW;
     canvas.height = srcH;
-    const ctx = canvas.getContext("2d")!;
-
-    if (facingMode === "user" && !beautyOn) {
-      ctx.translate(srcW, 0);
-      ctx.scale(-1, 1);
-    }
-
-    if (hasFilter) {
-      const tmp = document.createElement("canvas");
-      tmp.width = srcW;
-      tmp.height = srcH;
-      const tctx = tmp.getContext("2d")!;
-      tctx.filter = f.css;
-      tctx.drawImage(src as CanvasImageSource, 0, 0);
-      tctx.filter = "none";
-      ctx.drawImage(tmp, 0, 0);
-    } else {
-      ctx.drawImage(src as CanvasImageSource, 0, 0);
-    }
-
+    canvas.getContext("2d")!.drawImage(filtered, 0, 0);
     _saveCapture(canvas);
   };
 
