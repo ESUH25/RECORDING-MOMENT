@@ -15,7 +15,10 @@ function App() {
   const [mediaItems, setMediaItems] = useState<MediaItem[]>(() => {
     try {
       const saved = localStorage.getItem("remon_media");
-      return saved ? (JSON.parse(saved) as MediaItem[]) : [];
+      if (!saved) return [];
+      const items = JSON.parse(saved) as MediaItem[];
+      const now = Date.now();
+      return items.filter((i) => now - (i.capturedAt ?? now) < TWENTY_FOUR_H);
     } catch {
       return [];
     }
@@ -104,7 +107,6 @@ function App() {
 
   if (screen === "splash")
     return <SplashScreen onFinish={handleSplashFinish} />;
-
   if (screen === "login")
     return (
       <LoginScreen
@@ -114,7 +116,6 @@ function App() {
         onGoSignUp={() => setScreen("signup")}
       />
     );
-
   if (screen === "signup")
     return (
       <SignupScreen
@@ -131,6 +132,8 @@ function App() {
         onCapture={handleCapture}
         onNavigate={navigateTo}
         onLogout={handleLogout}
+        captures={mediaItems}
+        onDelete={handleDelete}
       />
     );
 

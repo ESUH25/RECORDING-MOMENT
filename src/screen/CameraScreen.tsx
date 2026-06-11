@@ -9,35 +9,12 @@ import { FaceBeautyEngine, DEFAULT_BEAUTY } from "../Facebeautyengine.ts";
 import type { BeautyParams } from "../Facebeautyengine.ts";
 import "./CameraScreen.css";
 
-const STORAGE_KEY = "remon__captures";
-const H24 = 24 * 60 * 60 * 1000;
-
-function loadCaptures(): MediaItem[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const items: MediaItem[] = JSON.parse(raw);
-    const now = Date.now();
-    return items.filter((item) => now - item.capturedAt < H24);
-  } catch {
-    return [];
-  }
-}
-
-function saveCaptures(items: MediaItem[]) {
-  try {
-    const now = Date.now();
-    const filtered = items.filter((item) => now - item.capturedAt < H24);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-  } catch {
-    // localStorage 용량 초과 시 무시
-  }
-}
-
 interface CameraScreenProps {
   onCapture?: (item: MediaItem) => void;
   onNavigate?: (screen: Screen) => void;
   onLogout?: () => void;
+  captures?: MediaItem[];
+  onDelete?: (ids: string | string[]) => void;
 }
 
 const CompositionIcon: React.FC = () => (
@@ -129,16 +106,19 @@ const FrameIcon: React.FC = () => (
   </svg>
 );
 
-const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
+const CameraScreen: React.FC<CameraScreenProps> = ({
+  onCapture,
+  onLogout,
+  captures = [],
+  onDelete,
+}) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const beautyCanvasRef = useRef<HTMLCanvasElement>(null);
-  const captureCanvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const engineRef = useRef<FaceBeautyEngine | null>(null);
 
   const [facingMode, setFacingMode] = useState<FacingMode>("environment");
-  const [captures, setCaptures] = useState<MediaItem[]>(() => loadCaptures());
   const [showGallery, setShowGallery] = useState(false);
   const [showFrameStudio, setShowFrameStudio] = useState(false);
   const [flashVisible, setFlashVisible] = useState(false);
@@ -168,11 +148,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
   const anyBeauty = beautyOn;
   const panelOpen = showBeauty || showFilter;
 
-  // captures 변경 시 localStorage에 저장
-  useEffect(() => {
-    saveCaptures(captures);
-  }, [captures]);
-
   useEffect(() => {
     beautyParamsRef.current = beautyParams;
     engineRef.current?.updateParams(beautyParams);
@@ -182,10 +157,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
     activeFilterRef.current = filter;
     setActiveFilter(filter);
     const video = videoRef.current;
-    if (video && !beautyParamsRef.current) return;
-    if (video) {
-      video.style.filter = filter.css === "none" ? "" : filter.css;
-    }
+    if (video) video.style.filter = filter.css === "none" ? "" : filter.css;
   }, []);
 
   useEffect(() => {
@@ -214,9 +186,8 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
           void videoRef.current!.play();
           setCameraReady(true);
           const f = activeFilterRef.current;
-          if (videoRef.current) {
+          if (videoRef.current)
             videoRef.current.style.filter = f.css === "none" ? "" : f.css;
-          }
         };
       }
       setError(null);
@@ -253,8 +224,8 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
               zoom?: { min: number; max: number };
             };
           if (capabilities.zoom) {
-            const minZ = capabilities.zoom.min;
-            const maxZ = capabilities.zoom.max;
+            const minZ = capabilities.zoom.min,
+              maxZ = capabilities.zoom.max;
             const mappedZoom = minZ + ((clamped - 0.5) / 4.5) * (maxZ - minZ);
             await track.applyConstraints({
               advanced: [
@@ -367,11 +338,9 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
     const ctx = out.getContext("2d")!;
     ctx.drawImage(srcCanvas, 0, 0);
     if (filter.id === "normal") return out;
-
     const imageData = ctx.getImageData(0, 0, out.width, out.height);
     const d = imageData.data;
     const p = parseCssFilter(filter.css);
-
     for (let i = 0; i < d.length; i += 4) {
       let r = d[i],
         g = d[i + 1],
@@ -383,17 +352,17 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
         b = b + (gray - b) * p.grayscale;
       }
       if (p.sepia > 0) {
-        const sr = Math.min(255, r * 0.393 + g * 0.769 + b * 0.189);
-        const sg = Math.min(255, r * 0.349 + g * 0.686 + b * 0.168);
-        const sb = Math.min(255, r * 0.272 + g * 0.534 + b * 0.131);
+        const sr = Math.min(255, r * 0.393 + g * 0.769 + b * 0.189),
+          sg = Math.min(255, r * 0.349 + g * 0.686 + b * 0.168),
+          sb = Math.min(255, r * 0.272 + g * 0.534 + b * 0.131);
         r = r + (sr - r) * p.sepia;
         g = g + (sg - g) * p.sepia;
         b = b + (sb - b) * p.sepia;
       }
       if (p.hueRotate !== 0) {
-        const angle = (p.hueRotate * Math.PI) / 180;
-        const cos = Math.cos(angle),
-          sin = Math.sin(angle);
+        const a = (p.hueRotate * Math.PI) / 180,
+          cos = Math.cos(a),
+          sin = Math.sin(a);
         const nr =
           r * (0.213 + cos * 0.787 - sin * 0.213) +
           g * (0.715 - cos * 0.715 - sin * 0.715) +
@@ -439,7 +408,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
-
     const src =
       beautyOn && beautyCanvasRef.current ? beautyCanvasRef.current : video;
     const srcW =
@@ -450,7 +418,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
       src instanceof HTMLVideoElement
         ? src.videoHeight
         : (src as HTMLCanvasElement).height;
-
     const mid = document.createElement("canvas");
     mid.width = srcW;
     mid.height = srcH;
@@ -460,15 +427,10 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
       mctx.scale(-1, 1);
     }
     mctx.drawImage(src, 0, 0);
-
     const filtered = applyFilterToCanvas(mid, f);
     canvas.width = srcW;
     canvas.height = srcH;
     canvas.getContext("2d")!.drawImage(filtered, 0, 0);
-    _saveCapture(canvas);
-  };
-
-  const _saveCapture = (canvas: HTMLCanvasElement) => {
     setFlashVisible(true);
     setTimeout(() => setFlashVisible(false), 250);
     const url = canvas.toDataURL("image/jpeg", 0.95);
@@ -479,7 +441,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
       id: String(now),
       capturedAt: now,
     };
-    setCaptures((prev) => [item, ...prev]);
     onCapture?.(item);
   };
 
@@ -491,14 +452,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
     engineRef.current = null;
     setShowBeauty(false);
     setFacingMode((f) => (f === "environment" ? "user" : "environment"));
-  };
-
-  const handleDelete = (ids: string | string[]) => {
-    setCaptures((prev) =>
-      Array.isArray(ids)
-        ? prev.filter((c) => !ids.includes(c.id))
-        : prev.filter((c) => c.id !== ids),
-    );
   };
 
   const toggleBeauty = () => {
@@ -527,7 +480,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
     <div className="cam">
       <div className={`cam__flash ${flashVisible ? "cam__flash--on" : ""}`} />
       <div className="cam__grain" />
-
       <video
         ref={videoRef}
         className={`cam__video ${facingMode === "user" ? "cam__video--mirrored" : ""} ${beautyOn ? "cam__video--hidden" : ""}`}
@@ -539,16 +491,12 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
         onTouchEnd={handleVideoTouchEnd}
         style={{ touchAction: "none", transition: "filter 0.25s ease" }}
       />
-
       <canvas
         ref={beautyCanvasRef}
         className={`cam__beauty-canvas ${beautyOn ? "cam__beauty-canvas--visible" : ""}`}
       />
       <canvas ref={canvasRef} style={{ display: "none" }} />
-      <canvas ref={captureCanvasRef} style={{ display: "none" }} />
-
       {showGrid && <div className="cam__grid" />}
-
       <div
         className={`cam__zoom-overlay ${showZoomUI ? "cam__zoom-overlay--visible" : ""}`}
       >
@@ -564,14 +512,12 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
           <span className="cam__zoom-limit">5x</span>
         </div>
       </div>
-
       {beautyLoading && (
         <div className="cam__beauty-loading">
           <div className="cam__beauty-spinner" />
           <span>리터치 준비 중...</span>
         </div>
       )}
-
       <div className="cam__header">
         <div className="cam__logo">re-mon</div>
         <div className="cam__header-actions">
@@ -624,7 +570,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
           )}
         </div>
       </div>
-
       <div className="cam__bottom">
         <div
           className={`cam__controls ${panelOpen ? "cam__controls--hidden" : ""}`}
@@ -643,7 +588,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
               <span className="cam__gallery-count">{captures.length}</span>
             )}
           </button>
-
           <div className="cam__shutter-group">
             <button
               className="cam__flip-btn"
@@ -661,7 +605,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
               <div className="cam__shutter-inner" />
             </button>
           </div>
-
           <button
             className="cam__frame-btn"
             onClick={() => setShowFrameStudio(true)}
@@ -671,7 +614,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
             <span>프레임</span>
           </button>
         </div>
-
         {showBeauty && (
           <FaceBeautyPanel
             params={beautyParams}
@@ -691,7 +633,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
             onConfirm={() => setShowBeauty(false)}
           />
         )}
-
         {showFilter && (
           <FilterSelector
             activeId={activeFilter.id}
@@ -700,12 +641,11 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
           />
         )}
       </div>
-
       {showGallery && (
         <Gallery
           captures={captures}
           onClose={() => setShowGallery(false)}
-          onDelete={handleDelete}
+          onDelete={onDelete ?? (() => {})}
         />
       )}
       {showFrameStudio && (
@@ -714,7 +654,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onCapture, onLogout }) => {
           onClose={() => setShowFrameStudio(false)}
         />
       )}
-
       {error && (
         <div className="cam__error">
           <span>⚠ {error}</span>
